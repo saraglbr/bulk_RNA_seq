@@ -99,6 +99,8 @@ counts <- counts(dds, normalized=TRUE)
 
 
 ### PCA
+Generate a PCA to show similarities/differences across all samples 
+
 ```{r fig.height=5, fig.width=8}
 #PCA
 object <- rld
@@ -156,11 +158,12 @@ setwd("~/phd/thesis_figures/TKO_chapter/panels/D6_only")
 pdf("PCA_D6_only.pdf", height=5, width=8)
 pca_plot
 dev.off
-
-
 ```
 
-### Determine which genes are contributing to each PC in the PCA plot
+
+
+### PCA contributions
+Determine which genes are contributing to each PC in the PCA plot
 ```{r}
 summary(pca)
 var <- get_pca_var(pca) #extracts the data for the PCA
@@ -169,7 +172,6 @@ gene.contribution <- var$contrib #creates a matrix in which rows = genes and col
 
 ### PC1
 ```{r}
-
 #convert matrix to a dataframe, sort based on the highest contribution to Dim1 and select the top 500 genes
 gene.contribution <- as.data.frame(gene.contribution)
 sorted_gene.contribution_1 <- rownames(head(gene.contribution[order(-gene.contribution$Dim.1), ], n=500)) 
@@ -188,13 +190,10 @@ heatmap_PC1 <- pheatmap(significant_subset_pc1,
          fontsize_row = 8,
          col = colorRampPalette(brewer.pal(9, "YlOrRd"))(100),
          fontsize_col=9, main = "All DEGs ")
-
 ```
-
 
 ##PC2
 ```{r}
-
 #Sort gene.contribution based on the highest contribution to Dim2 and select the top 500 genes
 sorted_gene.contribution_2 <- rownames(head(gene.contribution[order(-gene.contribution$Dim.2), ], n=500))
 
@@ -210,7 +209,10 @@ heatmap_PC2 <- pheatmap(significant_subset_pc2,
          fontsize_col=9, main = "All DEGs ")
 ```
 
+
 ###Combine PC1 and PC2
+Combine PC1 and PC2 top contributing genes, and perform hierarchical clustering to then separate them into 4 different clusters 
+
 ```{r}
 #Combine both gene list (PC1 top 500 and PC2 tolp 500)
 significant_subset_join <- rbind(significant_subset_pc1, significant_subset_pc2)
@@ -252,10 +254,10 @@ pdf("heatmap_PCA_defined_genes.pdf")
 heatmap
 dev.off()
 write.csv(my_gene_col, "genes_in_each_cluster.csv")
-
 ```
 
-#Use GO enrichment to determine what types of genes contribute to each cluster
+#Cluster functions
+Use GO enrichment to determine what types of genes contribute to each cluster and what might be their biological funciton
 
 ```{r}
 #Select genes that contribute specifically to each cluster 1, 2, 3, or 4
