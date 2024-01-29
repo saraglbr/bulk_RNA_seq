@@ -10,9 +10,9 @@ Two time-points: EpiLCs (Day 0) and Day 6 of differentiation
 Two genotypes: wild type (tg2a) and mutant (TKO)
 And two conditions at day 6: with (+) or without (-) cytokines 
 
-# SET UP \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
+SET UP \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
 
-### Libraries
+#Libraries
 
 ```{r setup, include=FALSE}
 library (DESeq2)
@@ -31,45 +31,32 @@ library(dendextend)
 library(ggpattern)
 library(reshape)
 library("factoextra")
-
-
 ```
 
-##Load count matrix
-
+#Load count matrix
 In order to generate the count matrix the following steps have been performed prior to loading the data onto R:
  • Adaptor trimming with Trim galore
  • Aligment of reads to the mouse genome (mm10) wiht STAR
  • Quality filtering (Q10 filtering) with samtools 
  • And generation of count matrix with feature counts 
- 
 
 ```{r}
 setwd("~/phd/Bulk_RNA/TKO_NO_CYT/")
 count_all <- read.csv("count_matrix_all.csv", row.names=1)
 count_epi <- count_all[grepl("epilc", names(count_all))]
 count_diff <- count_all[!grepl("epilc", names(count_all))]
-```
-
-```{r}
-setwd("~/phd/Bulk_RNA/TKO_NO_CYT/")
 colTable <- read.csv ("exp_desing.csv", sep=",", header = 1, row.names = 1)
-
 colTable_epi <- colTable[colTable$stage=="epilc", ]
 colTable_diff <- colTable[!colTable$stage=="epilc", ]
-
 ```
 
-
-
 Analysis of all samples together -\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
-Run deseq2 on all samples 
+#Run deseq2 on all samples 
 ```{r}
 colorder <- c("tg2a_cyt_D6_1"    ,   "tg2a_cyt_D6_2"   ,  "tg2a_no_cyt_epilc_1",  "tg2a_no_cyt_epilc_2"   ,  "tg2a_no_cyt_D6_1"  , "tg2a_no_cyt_D6_2","tko_epilc_2"     ,    "tko_epilc_1"         ,     "tko_D6_2"      ,      "tko_D6_1"   ,  "TKO_NO_CYT_D6_1"  ,    "TKO_NO_CYT_D6_2")
 
 count_sample <- count_all[, colorder]
 colnames(count_sample)
-
 
 count_sample[is.na(count_sample)] <- 0 # set any NA values to 0
 dds <- DESeqDataSetFromMatrix(countData= count_sample, 
@@ -81,26 +68,20 @@ notAllZero <- (rowSums(counts(dds))>10)
 dds <- dds[notAllZero,]
 dds #sum of counts across all samples higher than 10 -> 18678
 
-
 #Stablish Tg2a_no_cyt as control and run deseq2
 dds$line <- relevel( dds$line, "tg2a" )
 as.data.frame( colData(dds) )
 dds_result <- DESeq(dds)
 
-
 rld <- rlog(dds, blind=FALSE)
 expression <- as.data.frame((assay(dds)))
 dds <- estimateSizeFactors(dds)
 counts <- counts(dds, normalized=TRUE)
-
-
 ```
 
 
-
-### PCA
+#PCA
 Generate a PCA to show similarities/differences across all samples 
-
 ```{r fig.height=5, fig.width=8}
 #PCA
 object <- rld
@@ -140,7 +121,6 @@ pcaData$line <- factor(pcaData$line,     # Reorder factor levels
 x_axis <-   paste0("PC1: ",round(percentVar[1, ] * 100),"% variance")
 y_axis <- paste0("PC2: ",round(percentVar[2, ] * 100),"% variance")
 
-
 #Plot PCA plot 
 pca_plot <- ggplot(pcaData, aes(x = PC1, y = PC2)) +
   geom_point(size =4, 
@@ -162,7 +142,7 @@ dev.off
 
 
 
-### PCA contributions
+#PCA contributions
 Determine which genes are contributing to each PC in the PCA plot
 ```{r}
 summary(pca)
