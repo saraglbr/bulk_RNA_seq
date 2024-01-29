@@ -62,8 +62,8 @@ colTable_diff <- colTable[!colTable$stage=="epilc", ]
 
 
 
-# Analysis of all samples together -\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
-
+Analysis of all samples together -\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
+Run deseq2 on all samples 
 ```{r}
 colorder <- c("tg2a_cyt_D6_1"    ,   "tg2a_cyt_D6_2"   ,  "tg2a_no_cyt_epilc_1",  "tg2a_no_cyt_epilc_2"   ,  "tg2a_no_cyt_D6_1"  , "tg2a_no_cyt_D6_2","tko_epilc_2"     ,    "tko_epilc_1"         ,     "tko_D6_2"      ,      "tko_D6_1"   ,  "TKO_NO_CYT_D6_1"  ,    "TKO_NO_CYT_D6_2")
 
