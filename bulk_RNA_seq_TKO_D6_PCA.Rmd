@@ -142,7 +142,7 @@ dev.off
 
 
 
-#PCA contributions
+##PCA contributions
 Determine which genes are contributing to each PC in the PCA plot
 ```{r}
 summary(pca)
@@ -172,7 +172,7 @@ heatmap_PC1 <- pheatmap(significant_subset_pc1,
          fontsize_col=9, main = "All DEGs ")
 ```
 
-##PC2
+###PC2
 ```{r}
 #Sort gene.contribution based on the highest contribution to Dim2 and select the top 500 genes
 sorted_gene.contribution_2 <- rownames(head(gene.contribution[order(-gene.contribution$Dim.2), ], n=500))
@@ -236,7 +236,7 @@ dev.off()
 write.csv(my_gene_col, "genes_in_each_cluster.csv")
 ```
 
-#Cluster functions
+###Cluster functions
 Use GO enrichment to determine what types of genes contribute to each cluster and what might be their biological funciton
 
 ```{r}
