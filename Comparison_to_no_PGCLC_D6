@@ -1,3 +1,12 @@
+
+#Pairwise comparisons of day 6 samples (TKO +/- cytokines and WT +cytokines) vs day 6 NO PGCLC. And assessment of the overlap between up and downregulated genes in these comparisons.
+
+
+
+
+
+
+
 #Load data and select only differentiated samples //////////////////// 
 ```{r}
 setwd("~/phd/Bulk_RNA/TKO_NO_CYT/")
