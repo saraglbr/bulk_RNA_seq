@@ -1,0 +1,290 @@
+#Load data and select only differentiated samples //////////////////// 
+```{r}
+setwd("~/phd/Bulk_RNA/TKO_NO_CYT/")
+count_all <- read.csv("count_matrix_all.csv", row.names=1)
+count_diff <- count_all[!grepl("epilc", names(count_all))]
+colTable <- read.csv ("exp_desing.csv", sep=",", header = 1, row.names = 1)
+colTable_diff <- colTable[!colTable$stage=="epilc", ]
+```
+
+#Run deseq2 on diffrentiated samples only  ////////////////////
+```{r}
+count_sample <- count_diff
+colTable <- colTable_diff
+
+colTable$combined_conditions <- with(colTable, paste(line, stage, cytokines, sep = ":"))
+
+colTable <- colTable[ , c("stage", "combined_conditions")]
+
+count_sample[is.na(count_sample)] <- 0 # set any NA values to 0
+dds <- DESeqDataSetFromMatrix(countData= count_sample, 
+                              colData=colTable, design= ~ combined_conditions)
+dds 
+
+notAllZero <- (rowSums(counts(dds))>10) 
+dds <- dds[notAllZero,]
+dds #sum of counts across all samples higher than 10 -> 18678
+
+#Stablish Tg2a_no_cyt as control and run deseq2
+as.data.frame( colData(dds) )
+dds_result <- DESeq(dds)
+
+dds_diff <- dds_result
+
+
+#Extract expression data (log transform and save as expression)
+rld_diff <- rlog(dds_diff, blind=TRUE)
+expression_diff <- as.data.frame((assay(rld_diff)))
+
+```
+
+
+#Pairwise comparisons against WT no cytokines (D6 NO PGCLC)  ////////////////////
+
+##Create a function called pairwise comparison that generates and saves to relevant directory: 
+	#1) Table of differentially expressed genes 
+	#2) Volcano plot
+	#3) Talbes of GO enrichment results of genes up and down regulated 
+	#4) Plot of top 10 GO enrichment results of genes up and down regulated  
+
+pairwise_comparison <- function(sample_test, sample_control, tit, name) {
+  
+  # Automatically generate file names based on the base name
+  file_name <- paste(name, ".csv", sep = "")
+  volcano_name <- paste(name, ".pdf", sep = "")
+  GO_name_up <- paste("GO_UP_", name, ".csv", sep = "")
+  GO_name_DOWN <- paste("GO_DOWN_", name, ".csv", sep = "")
+  GO_plot_up <- paste("GO_plot_UP_", name, ".pdf", sep = "")
+  GO_plot_DOWN <- paste("GO_plot_DOWN_", name, ".pdf", sep = "")
+
+  # Directories (hardcoded/stable)
+  working_dir_DEGs <- "~/phd/Bulk_RNA/TKO_NO_CYT/analysis/DEGs/"
+  working_dir_volcano <- "~/phd/Bulk_RNA/TKO_NO_CYT/analysis/volcanos/"
+  working_dir_GO <- "~/phd/Bulk_RNA/TKO_NO_CYT/analysis/GO/"
+  working_dir_GO_plots <- "~/phd/Bulk_RNA/TKO_NO_CYT/analysis/GO/plots/"
+
+  # Make contrast of specific samples
+  cont_resuls <- results(dds_diff, contrast = c("combined_conditions", sample_test, sample_control), 
+                         lfcThreshold = 0.5)
+
+  # Count all up and downregulated genes
+  upregulated_genes <- sum(cont_resuls$log2FoldChange > 2 & cont_resuls$padj < 0.05 & complete.cases(cont_resuls))
+  downregulated_genes <- sum(cont_resuls$log2FoldChange < -2 & cont_resuls$padj < 0.05 & complete.cases(cont_resuls))
+
+  # Order the results by ascending p-value and select top 15 genes
+  cont_resuls_ordered <- cont_resuls[order(cont_resuls$padj), ]
+  top_genes <- rownames(head(cont_resuls_ordered, 40))
+
+  # Create the volcano plot
+  volcano <- EnhancedVolcano(cont_resuls,
+    lab = NA,  # rownames(cont_resuls),
+    x = 'log2FoldChange',
+    y = 'padj',
+    title = tit,
+    xlim = c(-15, 15),
+    ylim = c(0, 200),
+    FCcutoff = 1.5,
+    pCutoff = 0.05,
+    pointSize = 7.0,
+    widthConnectors = 0.0055,
+    colConnectors = 'black',
+    col = c('black', 'black', 'black', "cyan3")
+  ) + 
+  theme(plot.title = element_text(size = 65),
+        plot.subtitle = element_text(size = 0),
+        axis.text.x = element_text(size = 52),
+        axis.text.y = element_text(size = 52),
+        axis.title = element_text(size = 55),
+        legend.text = element_text(size = 0)) + 
+  annotate("text", x = +15, y = 200, label = paste("Up:", upregulated_genes),
+           hjust = 1, vjust = 0, size = 17) +
+  annotate("text", x = -15, y = 200, label = paste("Down:", downregulated_genes),
+           hjust = 0, vjust = 0, size = 17)
+
+  # Plot volcano
+  print(volcano)
+
+  # Save DEGs and volcano plot
+  setwd(working_dir_DEGs)
+  write.csv(cont_resuls, file = file_name, quote = FALSE)
+
+  setwd(working_dir_volcano)
+  pdf(volcano_name, width = 15, height = 15)
+  print(volcano)
+  dev.off()
+
+  # GO enrichment
+  genes_up <- rownames(cont_resuls[cont_resuls$log2FoldChange > 2 & cont_resuls$padj < 0.05 & complete.cases(cont_resuls), ])
+  genes_down <- rownames(cont_resuls[cont_resuls$log2FoldChange < -2 & cont_resuls$padj < 0.05 & complete.cases(cont_resuls), ])
+
+  entrez_up <- bitr(genes_up, fromType = "SYMBOL", toType = c("ENTREZID"), OrgDb = org.Mm.eg.db)
+  entrez_down <- bitr(genes_down, fromType = "SYMBOL", toType = c("ENTREZID"), OrgDb = org.Mm.eg.db)
+
+  enrichment_up <- enrichGO(gene = entrez_up$ENTREZID, OrgDb = org.Mm.eg.db, readable = T, ont = "BP",
+                            pvalueCutoff = 0.05, qvalueCutoff = 0.10)
+  enrichment_down <- enrichGO(gene = entrez_down$ENTREZID, OrgDb = org.Mm.eg.db, readable = T, ont = "BP",
+                              pvalueCutoff = 0.05, qvalueCutoff = 0.10)
+
+  setwd(working_dir_GO)
+  write.csv(enrichment_up, file = GO_name_up, quote = FALSE)
+  write.csv(enrichment_down, file = GO_name_DOWN, quote = FALSE)
+
+  # Plot GO enrichment
+  setwd(working_dir_GO_plots)
+  pdf(GO_plot_up, width = 19, height = 12)
+  enrichment_up2 <- pairwise_termsim(enrichment_up)
+  treeplot(enrichment_up2)
+  dev.off()
+
+  pdf(GO_plot_DOWN, width = 19, height = 12)
+  enrichment_down2 <- pairwise_termsim(enrichment_down)
+  treeplot(enrichment_down2)
+  dev.off()
+
+  # Save bar plots
+  pdf(paste0("bar_", GO_plot_up))
+  barplot(enrichment_up, showCategory = 10)
+  dev.off()
+
+  down <- barplot(enrichment_down, showCategory = 10)
+
+  pdf(paste0("bar_", GO_plot_DOWN))
+  down
+  dev.off()
+}
+
+
+#Use this function to do pairwise comparisons /////////
+
+```{r fig.height=15 , fig.width=15}
+#TKO + cyt 
+pairwise_comparison(
+	sample_test <- "TKO:D6:yes"
+	sample_control <- "tg2a:D6:no"
+	tit <- "Day 6 TKO +cyt"
+	name = "D6_TKOscyt_Tg2anocyt"
+)
+
+#TKO no cyt
+pairwise_comparison(
+	sample_test <- "TKO:D6:no"
+	sample_control <- "tg2a:D6:no"
+	tit <- "Day 6 TKO -cyt"
+	name = "D6_TKOnocyt_Tg2anocyt"
+)
+
+#WT+cyt
+pairwise_comparison(
+	sample_test <- "tg2a:D6:yes"
+	sample_control <- "tg2a:D6:no"
+	tit <- "Day 6 wild type +cyt"
+	name = "D6_Tg2aocyt_Tg2anocyt"
+)
+```
+
+
+
+
+
+#Check the overlap of up and down regulated genes ////////////////////
+
+```{r}
+#Load differentially expressed genes of samples compared to negative control
+setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/DEGs/")
+tkocyt <- read.csv("D6_TKOscyt_Tg2anocyt.csv", row.names=1)
+tkonocyt <- read.csv("D6_TKOnocyt_Tg2anocyt.csv", row.names=1)
+tg2a <- read.csv("D6_Tg2aocyt_Tg2anocyt.csv", row.names=1)
+
+# Select only significantly dysrgulted genes (P value lower than 0.05)
+tkocyt <- subset(tkocyt, padj != "NA" & padj < 0.05)
+tkonocyt <- subset(tkonocyt, padj != "NA" & padj < 0.05)
+tg2a <- subset(tg2a, padj != "NA" & padj <0.05)
+
+# Filter rows based on log2FoldChange to separate into upregulatd and downregulated genes
+UP_tg2a <- as.vector(rownames(subset(tg2a, log2FoldChange > 1)))
+DOWN_tg2a <- as.vector(rownames(subset(tg2a, log2FoldChange < -1)))
+
+UP_tkonocyt <- as.vector(rownames(subset(tkonocyt, log2FoldChange > 1)))
+DOWN_tkonocyt <- as.vector(rownames(subset(tkonocyt, log2FoldChange < -1)))
+
+UP_tkocyt <- as.vector(rownames(subset(tkocyt, log2FoldChange > 1)))
+DOWN_tkocyt <- as.vector(rownames(subset(tkocyt, log2FoldChange < -1)))
+```
+
+
+##Generate a ven diagram  of the overlap //////////////////////////////////
+#UPREGULATED GENES
+```{r}
+all_up <- list( UP_tkocyt, UP_tg2a, UP_tkonocyt)
+plot <- ggVennDiagram(all_up, label_alpha = 0,
+              category.names = c("TKO", "Tg2a_cyt", "TKO_no"),
+              set_color = c("green", "red", "darkgreen" ),
+              label_size = 4) +
+  scale_color_manual(values = c("green","red", "darkgreen")) +
+      ggplot2::scale_fill_gradient(low="honeydew",high = "mediumpurple3")+
+      scale_x_continuous(expand = expansion(mult = .2))
+
+plot
+
+setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/overlap/")
+pdf("overlap_upregulated_allvstg2anocyt.pdf", width = 19, height = 12)  
+plot
+dev.off()
+```
+
+#DOWNREGULATED GENES
+```{r}
+all_down <- list( DOWN_tkocyt,DOWN_tg2a, DOWN_tkonocyt)
+plot <- ggVennDiagram(all_down, label_alpha = 0,
+              category.names = c("TKO", "TKO_no", "Tg2a_cyt"),
+              set_color = c("green","red", "darkgreen" ),
+              label_size = 4) +
+  scale_color_manual(values = c("green","red", "darkgreen")) +
+      ggplot2::scale_fill_gradient(low="honeydew",high = "mediumpurple3")+
+      scale_x_continuous(expand = expansion(mult = .2))
+
+plot
+
+setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/overlap/")
+pdf("overlap_downregulated_allvstg2anocyt.pdf", width = 19, height = 12)  
+plot
+dev.off()
+```
+
+#select common and unique for each catgory
+UP_common <- Reduce(intersect, list(UP_tg2a, UP_tkonocyt,UP_tkocyt ))
+DOWN_common <- Reduce(intersect, list(DOWN_tg2a, DOWN_tkonocyt,DOWN_tkocyt ))
+
+
+
+#GO ENRICHMENT OF COMMON UP AND DOWN GENES //////////////////////////////////////////////
+#GO enrichment of shared genes
+entrez_up = bitr(UP_common, fromType = "SYMBOL", toType = c("ENTREZID"),
+                 OrgDb = org.Mm.eg.db)  
+entrez_down = bitr(DOWN_common, fromType = "SYMBOL", toType = c("ENTREZID"),
+                   OrgDb = org.Mm.eg.db)  
+ernichment_up = enrichGO(gene = entrez_up$ENTREZID, 
+                      OrgDb = org.Mm.eg.db,readable = T,ont = "BP",
+                      pvalueCutoff = 0.05, qvalueCutoff = 0.10)
+
+ernichment_down = enrichGO(gene = entrez_down$ENTREZID, 
+                      OrgDb = org.Mm.eg.db,readable = T,ont = "BP",
+                      pvalueCutoff = 0.05, qvalueCutoff = 0.10)
+
+barplot(ernichment_up, showCategory=10) 
+barplot(ernichment_down, showCategory=10)
+
+#Save and plot
+setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/overlap/")
+write.csv(ernichment_up,file="GO_up_common.csv",quote=FALSE) #write table to csv file
+write.csv(ernichment_down,file="GO_down_common.csv",quote=FALSE) #write table to csv file
+
+setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/overlap/")
+pdf("BAR_GO_plot_DOWN_common.pdf", width = 19, height = 12)  
+barplot(ernichment_down, showCategory=10)
+dev.off()
+
+setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/overlap/")
+pdf("BAR_GO_plot_UP_common.pdf", width = 6, height = 5)  
+barplot(ernichment_up, showCategory=10)
+dev.off()
