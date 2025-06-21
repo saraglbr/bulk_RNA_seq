@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#Run as a job on a HPC environment
+#Takes fastq files and generates count matrix and strand specific bigwigs
+
+
 #CALLING THE VARIABLES"
 echo $1 # Read project folder
 echo $2 # name of the samples
