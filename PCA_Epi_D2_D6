@@ -118,30 +118,33 @@ pdf("PCA_all.pdf", height=5, width=8)
 pca_plot
 dev.off
 
-###Select top genes contributing to each variance and assess their funciton and expression 
 
-#Get the contribution of each gene to each Principipl component (PC)
+
+
+###Select top genes contributing to each variance and assess their funciton and expression //////////////////////////////////////////////
 ```{r}
+#Get the contribution of each gene to each Principipl component (PC)
 library("factoextra")
 summary(pca)
 var <- get_pca_var(pca)
 names(var)
 gene.contribution <- var$contrib
-
 gene.contribution <- as.data.frame(gene.contribution)
 
 #Generate heatmap with top 400 genes contributing to PC1 and PC2
-sorted_gene.contribution <- rownames(head(gene.contribution[order(-gene.contribution$Dim.1), ], n=400))
-counts_norm <- as.data.frame((assay(rld)))
-counts_norm[ ,"gene"]<- row.names(counts_norm)
-significant_subset <- subset(counts_norm, counts_norm$gene %in% sorted_gene.contribution)
-significant_subset_pc1 <- subset(significant_subset, select = -c(gene)) 
+sorted_gene.contribution <- rownames(head(gene.contribution[order(-gene.contribution$Dim.1), ], n=200)) #gets gene symbols for top 200 for PC1
+counts_norm <- as.data.frame((assay(rld))) #get deseq2 log normalized reads from de deseq2 object
+counts_norm[ ,"gene"]<- row.names(counts_norm) # add a column with gene symbols to be able to sort 
+significant_subset <- subset(counts_norm, counts_norm$gene %in% sorted_gene.contribution) #keep only the top200 genes
+significant_subset_pc1 <- subset(significant_subset, select = -c(gene)) #get rid of gene column again for plotting
 
+#Repeat for PC2
 sorted_gene.contribution <- rownames(head(gene.contribution[order(-gene.contribution$Dim.2), ], n=200))
 counts_norm[ ,"gene"]<- row.names(counts_norm)
 significant_subset <- subset(counts_norm, counts_norm$gene %in% sorted_gene.contribution)
 significant_subset_pc2 <- subset(significant_subset, select = -c(gene)) 
 
+#Join the two dataframes for top 400 genes 
 significant_subset_join <- rbind(significant_subset_pc1, significant_subset_pc2)
 
 #Separate genes into four different group with similar expression patterns
@@ -154,8 +157,8 @@ my_gene_col <- as.data.frame(my_gene_col)
 
 my_colour = list(
     my_gene_col = c("1" = "yellow", "2" = "lightblue", "3" = "pink", "4" = "lightgreen"
-                    )
-)
+                    ))
+
 heatmap <- pheatmap(significant_subset_join,
          show_rownames = TRUE, 
          fontsize_row = 2,
@@ -185,60 +188,48 @@ cluster2 <- rownames(my_gene_col[my_gene_col$my_gene_col==2, ])
 cluster3 <- rownames(my_gene_col[my_gene_col$my_gene_col==3, ])
 cluster4 <- rownames(my_gene_col[my_gene_col$my_gene_col==4, ])
 ```
-```{r}
-entrez_cluster1 = bitr(cluster1, fromType = "SYMBOL", toType = c("ENTREZID"),
-                 OrgDb = org.Mm.eg.db)  
-ernichment_cluster1 = enrichGO(gene = entrez_cluster1$ENTREZID, 
-                      OrgDb = org.Mm.eg.db,readable = T,ont = "BP",
-                      pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-barplot(ernichment_cluster1, showCategory=10) 
 
-setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/DEGS_based_on_PCA")
-pdf("GO_cluster1.pdf")
-barplot(ernichment_cluster1, showCategory=10) 
-dev.off()
-write.csv(ernichment_cluster1, "GO_cluster1.csv")
+#Make function to run GO in each of the clusters 
+```{r}
+perform_GO_enrichment <- function(cluster, cluster_name) {
+  # Convert gene symbols to Entrez IDs
+  entrez_genes <- bitr(cluster, fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Mm.eg.db) 
+  
+  # Run GO enrichment
+  enrichment <- enrichGO(
+    gene = entrez_genes$ENTREZID,
+    OrgDb = org.Mm.eg.db,
+    readable = TRUE,
+    ont = "BP", #biological process results only
+    pvalueCutoff = 0.05,
+    qvalueCutoff = 0.10
+  )
+  
+  # Save barplot to PDF
+  pdf(paste0("GO_", cluster_name, ".pdf"))
+  barplot(enrichment, showCategory = 10)
+  dev.off()
+  
+  # Save enrichment results to CSV
+  write.csv(enrichment, paste0("GO_", cluster_name, ".csv"))
+  
+  # Return enrichment object to R environemnt
+  return(enrichment)
+}
 ```
 
 ```{r}
-entrez_cluster2 = bitr(cluster2, fromType = "SYMBOL", toType = c("ENTREZID"),
-                 OrgDb = org.Mm.eg.db)  
-ernichment_cluster2 = enrichGO(gene = entrez_cluster2$ENTREZID, 
-                      OrgDb = org.Mm.eg.db,readable = T,ont = "BP",
-                      pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-barplot(ernichment_cluster2, showCategory=10) 
-
 setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/DEGS_based_on_PCA")
-pdf("GO_cluster2.pdf")
-barplot(ernichment_cluster2, showCategory=10) 
-dev.off()
-write.csv(ernichment_cluster2, "GO_cluster2.csv")
+enrich1 <- perform_GO_enrichment(cluster1, "cluster1")
+enrich2 <- perform_GO_enrichment(cluster2, "cluster2")
+enrich3 <- perform_GO_enrichment(cluster3, "cluster3")
+enrich4 <- perform_GO_enrichment(cluster4, "cluster4")
 ```
-```{r}
-entrez_cluster3 = bitr(cluster3, fromType = "SYMBOL", toType = c("ENTREZID"),
-                 OrgDb = org.Mm.eg.db)  
-ernichment_cluster3 = enrichGO(gene = entrez_cluster3$ENTREZID, 
-                      OrgDb = org.Mm.eg.db,readable = T,ont = "BP",
-                      pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-barplot(ernichment_cluster3, showCategory=10) 
 
-setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/DEGS_based_on_PCA")
-pdf("GO_cluster3.pdf")
-barplot(ernichment_cluster3, showCategory=10) 
-dev.off()
-write.csv(ernichment_cluster3, "GO_cluster3.csv")
-```
-```{r}
-entrez_cluster4 = bitr(cluster4, fromType = "SYMBOL", toType = c("ENTREZID"),
-                 OrgDb = org.Mm.eg.db)  
-ernichment_cluster4 = enrichGO(gene = entrez_cluster4$ENTREZID, 
-                      OrgDb = org.Mm.eg.db,readable = T,ont = "BP",
-                      pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-barplot(ernichment_cluster4, showCategory=10) 
 
-setwd("~/phd//Bulk_RNA/TKO_NO_CYT/analysis/DEGS_based_on_PCA")
-pdf("GO_cluster4.pdf")
-barplot(ernichment_cluster4, showCategory=10) 
-dev.off()
-write.csv(ernichment_cluster4, "GO_cluster4.csv")
-```
+
+
+
+
+
+
