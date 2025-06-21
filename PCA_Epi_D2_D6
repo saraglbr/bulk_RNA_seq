@@ -4,7 +4,7 @@ Three time-points: EpiLCs (Day 0), day 2 and Day 6 of PGCLC differentiation
 Two genotypes: wild type (tg2a) and mutant (TKO)
 And two conditions at day 6: with (+) or without (-) cytokines 
 
-Generation of PCA analysis and assessment of top genes contributing to PC1 and PC2
+Chunk of code --> Generation of PCA analysis and assessment of top genes contributing to PC1 and PC2
 
 
 ### Libraries
